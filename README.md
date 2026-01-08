@@ -6,6 +6,8 @@
 
 This contains everything you need to run your app locally.
 
+🌐 **Live Demo:** [https://chatbot5764.netlify.app/](https://chatbot5764.netlify.app/)
+
 View your app in AI Studio: https://ai.studio/apps/drive/1KR9pwynyW7Oo-I34_rOGNSGJUQUXOoIr
 
 ## Run Locally
@@ -40,5 +42,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1KR9pwynyW7Oo-I34_rOGNS
 5. **Deploy:**
    - Click "Deploy site"
    - Your app will be live at `https://your-site-name.netlify.app`
+
+**Live Site:** [https://chatbot5764.netlify.app/](https://chatbot5764.netlify.app/)
 
 **Note:** The `_redirects` file ensures proper SPA routing on Netlify.
