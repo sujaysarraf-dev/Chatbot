@@ -1,0 +1,8 @@
+{
+  "name": "Suji",
+  "description": "A clean, educational chatbot named Suji powered by Gemini 3 Flash, designed for learning and exploration without any sign-up requirements.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
