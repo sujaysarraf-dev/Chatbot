@@ -2,6 +2,73 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Role, QuizData } from "../types";
 
+// Fallback to OpenRouter when Gemini fails
+const fallbackToOpenRouter = async (message: string, history: any[]) => {
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (!openRouterKey) {
+    return {
+      text: "I encountered a technical hiccup. Please try again!",
+      suggestions: ["Try again"],
+      sources: []
+    };
+  }
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": window.location.origin,
+        "X-Title": "Suji Learning AI"
+      },
+      body: JSON.stringify({
+        model: "meta-llama/llama-3.2-3b-instruct",
+        messages: [
+          { 
+            role: "system", 
+            content: "You are Suji, a simple-learning tutor. Use bullet points (-), ALL CAPS for key terms, and **bold** for emphasis. Keep it energetic!" 
+          },
+          ...history.slice(-10).map((m: any) => ({ 
+            role: m.role === Role.USER ? "user" : "assistant", 
+            content: typeof m.text === 'string' ? m.text : JSON.stringify(m.text)
+          })),
+          { role: "user", content: message }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.error) {
+      // If it's a data policy error, provide helpful message
+      if (data.error.message?.includes('data policy') || data.error.message?.includes('privacy')) {
+        throw new Error("OpenRouter data policy not configured. Please visit https://openrouter.ai/settings/privacy to enable free model usage.");
+      }
+      throw new Error(data.error.message || "OpenRouter Error");
+    }
+    
+    const content = data.choices?.[0]?.message?.content;
+    const text = content || "I'm sorry, I couldn't get a response right now.";
+
+    return {
+      text,
+      suggestions: ["Explain more", "Give example", "Test my knowledge!"],
+      sources: []
+    };
+  } catch (e: any) {
+    console.error("OpenRouter fallback also failed:", e);
+    const errorMsg = e?.message || "Unknown error";
+    return {
+      text: errorMsg.includes('data policy') 
+        ? "OpenRouter needs privacy settings configured. Please visit https://openrouter.ai/settings/privacy and enable 'Free model publication'."
+        : "I encountered a technical hiccup. Please try again!",
+      suggestions: ["Try again"],
+      sources: []
+    };
+  }
+};
+
 const decodeBase64 = (base64: string) => {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -36,7 +103,28 @@ export const sendMessageToGemini = async (
   history: any[],
   imageData?: string
 ) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // ============================================
+  // GEMINI TEMPORARILY DISABLED - UNCOMMENT BELOW TO RE-ENABLE
+  // ============================================
+  
+  // Skip Gemini and use OpenRouter directly
+  console.log("Gemini disabled - using OpenRouter fallback");
+  return fallbackToOpenRouter(message, history);
+
+  /* UNCOMMENT BELOW TO RE-ENABLE GEMINI:
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error('Gemini API key is missing! Check .env.local file.');
+    console.error('process.env.API_KEY:', process.env.API_KEY);
+    console.error('process.env.GEMINI_API_KEY:', process.env.GEMINI_API_KEY);
+    return {
+      text: "API key not configured. Please check your .env.local file and restart the dev server.",
+      suggestions: ["Check configuration"],
+      sources: []
+    };
+  }
+  console.log('Using Gemini API key (first 10 chars):', apiKey.substring(0, 10) + '...');
+  const ai = new GoogleGenAI({ apiKey });
   const parts: any[] = [];
   
   if (imageData) {
@@ -71,34 +159,113 @@ export const sendMessageToGemini = async (
       sources
     };
   } catch (e) {
-    console.error("Gemini call failed:", e);
-    return {
-      text: "I hit a snag while thinking. Can you try asking that again?",
-      suggestions: ["Try again"],
-      sources: []
-    };
+    console.error("Gemini call failed, falling back to OpenRouter:", e);
+    // Fallback to OpenRouter if Gemini fails
+    return fallbackToOpenRouter(message, history);
   }
+  */
 };
 
 export const generateImage = async (prompt: string): Promise<string | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: `A vibrant, educational illustration of: ${prompt}. Clean style, white background.` }] },
-      config: {
-        imageConfig: { aspectRatio: "1:1" }
-      },
-    });
+  // ============================================
+  // GEMINI IMAGE GENERATION TEMPORARILY DISABLED - UNCOMMENT BELOW TO RE-ENABLE
+  // ============================================
+  
+  const imagePrompt = `A vibrant, educational illustration of: ${prompt}. Clean style, white background.`;
+  
+  // Skip Gemini and go straight to Hugging Face fallback
+  console.log("Gemini image generation disabled - using Hugging Face fallback");
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
+  /* UNCOMMENT BELOW TO RE-ENABLE GEMINI IMAGE GENERATION:
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  
+  // Try Gemini first if API key is available
+  if (apiKey) {
+    const ai = new GoogleGenAI({ apiKey });
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: { parts: [{ text: imagePrompt }] },
+        config: {
+          imageConfig: { aspectRatio: "1:1" }
+        },
+      });
+
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          return `data:image/png;base64,${part.inlineData.data}`;
+        }
       }
+    } catch (e: any) {
+      // Silently log for debugging, but don't show raw error to user
+      if (e?.error?.code === 429 || e?.error?.status === 'RESOURCE_EXHAUSTED') {
+        console.log("Gemini rate limit reached, trying fallback");
+      } else {
+        console.log("Gemini image generation failed, trying fallback");
+      }
+      // Fall through to fallback
     }
-  } catch (e) {
-    console.error("Image generation failed:", e);
   }
+  */
+
+  // Fallback: Try Hugging Face Inference API via Netlify serverless function (bypasses CORS)
+  const hfApiKey = process.env.HUGGINGFACE_API_KEY;
+  if (hfApiKey) {
+    try {
+      console.log("Trying Hugging Face for image generation");
+      
+      // Use Netlify serverless function to proxy the request (solves CORS issue)
+      const proxyUrl = import.meta.env.DEV 
+        ? "http://localhost:8888/.netlify/functions/hf-image-proxy"
+        : "/.netlify/functions/hf-image-proxy";
+      
+      const response = await fetch(proxyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          prompt: imagePrompt,
+          apiKey: hfApiKey 
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.image) {
+          return data.image; // Already in base64 format
+        }
+      } else if (response.status === 503) {
+        // Model is loading, wait and retry once
+        console.log("Hugging Face model loading, waiting...");
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const retryResponse = await fetch(proxyUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            prompt: imagePrompt,
+            apiKey: hfApiKey 
+          }),
+        });
+        if (retryResponse.ok) {
+          const retryData = await retryResponse.json();
+          if (retryData.image) {
+            return retryData.image;
+          }
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.log("Hugging Face API error:", response.status, errorData);
+      }
+    } catch (e) {
+      console.log("Hugging Face fallback failed:", e);
+    }
+  } else {
+    console.log("Hugging Face API key not configured");
+  }
+  
   return null;
 };
 
@@ -135,6 +302,14 @@ export const textToSpeech = async (text: string) => {
 };
 
 export const generateQuiz = async (topic: string): Promise<QuizData | null> => {
+  // ============================================
+  // GEMINI QUIZ GENERATION TEMPORARILY DISABLED - UNCOMMENT BELOW TO RE-ENABLE
+  // ============================================
+  
+  console.log("Gemini quiz generation disabled");
+  return null; // Quiz generation disabled for now
+
+  /* UNCOMMENT BELOW TO RE-ENABLE GEMINI QUIZ GENERATION:
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
@@ -174,4 +349,5 @@ export const generateQuiz = async (topic: string): Promise<QuizData | null> => {
     console.error("Failed to generate quiz JSON", e);
   }
   return null;
+  */
 };

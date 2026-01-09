@@ -2,8 +2,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Role, Message } from "../types";
 
-const OPENROUTER_KEY = "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";
-const FREE_MODEL = "google/gemma-2-9b-it:free";
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || "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";
+const FREE_MODEL = "meta-llama/llama-3.2-3b-instruct";
 
 /**
  * Ensures the input is always a string.

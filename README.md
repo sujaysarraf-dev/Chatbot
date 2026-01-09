@@ -17,7 +17,10 @@ View your app in AI Studio: https://ai.studio/apps/drive/1KR9pwynyW7Oo-I34_rOGNS
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Set environment variables in `.env.local`:
+   - `GEMINI_API_KEY` - Your Gemini API key (get it from [Google AI Studio](https://aistudio.google.com/apikey))
+   - `OPENROUTER_API_KEY` - Your OpenRouter API key (optional, for fallback text generation)
+   - `HUGGINGFACE_API_KEY` - Your Hugging Face API key (optional, for fallback image generation - get it from [Hugging Face](https://huggingface.co/settings/tokens))
 3. Run the app:
    `npm run dev`
 
@@ -38,7 +41,9 @@ View your app in AI Studio: https://ai.studio/apps/drive/1KR9pwynyW7Oo-I34_rOGNS
 4. **Set Environment Variables:**
    - In Netlify dashboard, go to Site settings → Environment variables
    - Add: `GEMINI_API_KEY` with your Gemini API key (get it from [Google AI Studio](https://aistudio.google.com/apikey))
-   - ⚠️ **Important:** Never commit your API key to the repository!
+   - Add (optional): `OPENROUTER_API_KEY` for fallback text generation
+   - Add (optional): `HUGGINGFACE_API_KEY` for fallback image generation (get it from [Hugging Face](https://huggingface.co/settings/tokens))
+   - ⚠️ **Important:** Never commit your API keys to the repository!
 
 5. **Deploy:**
    - Click "Deploy site"

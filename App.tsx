@@ -225,10 +225,20 @@ const App: React.FC = () => {
           await updateMessageImageData(messageId, finalImageData);
         }
       } else {
-        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: false } : m));
+        // Show user-friendly error message
+        setMessages(prev => prev.map(m => 
+          m.id === messageId 
+            ? { ...m, isGeneratingImage: false, text: m.text + "\n\n⚠️ Image generation is temporarily unavailable. Please try again in a few minutes." } 
+            : m
+        ));
       }
     } catch (e) {
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: false } : m));
+      console.error("Image generation error:", e);
+      setMessages(prev => prev.map(m => 
+        m.id === messageId 
+          ? { ...m, isGeneratingImage: false, text: m.text + "\n\n⚠️ Couldn't generate image right now. Please try again later." } 
+          : m
+      ));
     }
   };
 
@@ -284,7 +294,7 @@ const App: React.FC = () => {
           const uploadedUrl = await uploadImageToBucket(base64Img);
           finalBotImg = uploadedUrl || base64Img;
         }
-        botMsg = { id: 'b-' + Date.now(), role: Role.MODEL, text: finalBotImg ? `Here is your Suji Diagram!` : "I couldn't draw that right now.", imageData: finalBotImg || undefined, timestamp: new Date(), suggestions: ["Explain it"] };
+        botMsg = { id: 'b-' + Date.now(), role: Role.MODEL, text: finalBotImg ? `Here is your Suji Diagram!` : "I couldn't generate an image right now (Gemini rate limit). Try again in a few minutes!", imageData: finalBotImg || undefined, timestamp: new Date(), suggestions: ["Try again later", "Explain it"] };
       } else if (lowerText.includes("quiz") && !text.startsWith("START_QUIZ:")) {
         botMsg = { id: 'b-' + Date.now(), role: Role.MODEL, text: "Assessment ready! Pick a topic.", timestamp: new Date(), isQuizSetup: true, suggestedTopic: messages.length > 0 ? messages[messages.length-1].text : "General Learning" };
       } else if (text.startsWith("START_QUIZ:")) {
