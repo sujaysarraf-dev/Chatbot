@@ -210,30 +210,53 @@ export const generateImage = async (prompt: string): Promise<string | null> => {
 
   // Fallback: Try Hugging Face Inference API via Netlify serverless function (bypasses CORS)
   const hfApiKey = process.env.HUGGINGFACE_API_KEY;
+  console.log("Hugging Face API key available:", !!hfApiKey, hfApiKey ? `${hfApiKey.substring(0, 10)}...` : "not set");
   if (hfApiKey) {
     try {
       console.log("Trying Hugging Face for image generation");
       
-      // Use Netlify serverless function to proxy the request (solves CORS issue)
-      const proxyUrl = import.meta.env.DEV 
-        ? "http://localhost:8888/.netlify/functions/hf-image-proxy"
-        : "/.netlify/functions/hf-image-proxy";
+      // Check if we're in local development (not production)
+      const isLocalDev = typeof window !== 'undefined' && 
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
       
-      const response = await fetch(proxyUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ 
-          prompt: imagePrompt,
-          apiKey: hfApiKey 
-        }),
-      });
+      if (isLocalDev) {
+        console.log("Local dev detected - Netlify functions not available. Image generation works in production on Netlify.");
+        return null; // Skip in local dev, will work in production
+      }
+      
+      // Use Netlify serverless function to proxy the request (solves CORS issue)
+      // This only works in production on Netlify
+      const proxyUrl = "/.netlify/functions/hf-image-proxy";
+      
+      console.log("Calling Netlify function:", proxyUrl);
+      
+      let response;
+      try {
+        response = await fetch(proxyUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            prompt: imagePrompt,
+            apiKey: hfApiKey 
+          }),
+        });
+      } catch (fetchError: any) {
+        // Handle network errors
+        console.log("Netlify function not available:", fetchError.message);
+        return null;
+      }
+
+      console.log("Netlify function response status:", response.status);
 
       if (response.ok) {
         const data = await response.json();
+        console.log("Response data keys:", Object.keys(data));
         if (data.image) {
           return data.image; // Already in base64 format
+        } else {
+          console.error("No image in response:", data);
         }
       } else if (response.status === 503) {
         // Model is loading, wait and retry once
@@ -256,8 +279,14 @@ export const generateImage = async (prompt: string): Promise<string | null> => {
           }
         }
       } else {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        console.log("Hugging Face API error:", response.status, errorData);
+        const errorText = await response.text().catch(() => "Failed to read error");
+        console.error("Hugging Face API error:", response.status, errorText);
+        try {
+          const errorData = JSON.parse(errorText);
+          console.error("Error details:", errorData);
+        } catch {
+          console.error("Raw error:", errorText);
+        }
       }
     } catch (e) {
       console.log("Hugging Face fallback failed:", e);
@@ -302,52 +331,73 @@ export const textToSpeech = async (text: string) => {
 };
 
 export const generateQuiz = async (topic: string): Promise<QuizData | null> => {
-  // ============================================
-  // GEMINI QUIZ GENERATION TEMPORARILY DISABLED - UNCOMMENT BELOW TO RE-ENABLE
-  // ============================================
-  
-  console.log("Gemini quiz generation disabled");
-  return null; // Quiz generation disabled for now
-
-  /* UNCOMMENT BELOW TO RE-ENABLE GEMINI QUIZ GENERATION:
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Create a fun, educational 3-question MCQ quiz for a student about: "${topic}".`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            questions: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  question: { type: Type.STRING },
-                  options: { 
-                    type: Type.ARRAY, 
-                    items: { type: Type.STRING },
-                    description: "Provide exactly 4 options."
-                  },
-                  correctAnswerIndex: { type: Type.INTEGER },
-                  explanation: { type: Type.STRING, description: "A short, encouraging explanation." }
-                },
-                required: ["question", "options", "correctAnswerIndex", "explanation"]
-              }
-            }
-          },
-          required: ["title", "questions"]
-        }
-      }
-    });
-    const text = response.text?.trim();
-    if (text) return JSON.parse(text);
-  } catch (e) {
-    console.error("Failed to generate quiz JSON", e);
+  // Use OpenRouter for quiz generation since Gemini is disabled
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (!openRouterKey) {
+    console.error("OpenRouter API key not configured for quiz generation");
+    return null;
   }
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": window.location.origin,
+        "X-Title": "Suji Learning AI"
+      },
+      body: JSON.stringify({
+        model: "meta-llama/llama-3.2-3b-instruct",
+        messages: [
+          {
+            role: "system",
+            content: "You are a quiz generator. Create fun, educational quizzes. Always respond with valid JSON only, no other text."
+          },
+          {
+            role: "user",
+            content: `Create a fun, educational 3-question MCQ quiz for a student about: "${topic}". 
+
+Return ONLY valid JSON in this exact format:
+{
+  "title": "Quiz Title",
+  "questions": [
+    {
+      "question": "Question text",
+      "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+      "correctAnswerIndex": 0,
+      "explanation": "Short explanation"
+    }
+  ]
+}`
+          }
+        ],
+        response_format: { type: "json_object" }
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.error) {
+      console.error("OpenRouter quiz generation error:", data.error);
+      return null;
+    }
+    
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) return null;
+    
+    try {
+      const quizData = JSON.parse(content);
+      // Validate quiz structure
+      if (quizData.title && quizData.questions && Array.isArray(quizData.questions)) {
+        return quizData as QuizData;
+      }
+    } catch (parseError) {
+      console.error("Failed to parse quiz JSON:", parseError, content);
+    }
+  } catch (e) {
+    console.error("Quiz generation failed:", e);
+  }
+  
   return null;
-  */
 };

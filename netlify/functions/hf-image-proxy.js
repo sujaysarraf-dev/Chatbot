@@ -27,9 +27,10 @@ exports.handler = async (event, context) => {
 
     console.log("Calling Hugging Face API for image generation");
 
-    // Call Hugging Face Inference API (using new router endpoint)
+    // Call Hugging Face Inference API
+    // Use the standard inference API endpoint
     const response = await fetch(
-      "https://router.huggingface.co/models/runwayml/stable-diffusion-v1-5",
+      "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5",
       {
         method: "POST",
         headers: {
