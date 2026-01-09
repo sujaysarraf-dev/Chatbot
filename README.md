@@ -37,7 +37,8 @@ View your app in AI Studio: https://ai.studio/apps/drive/1KR9pwynyW7Oo-I34_rOGNS
 
 4. **Set Environment Variables:**
    - In Netlify dashboard, go to Site settings → Environment variables
-   - Add: `GEMINI_API_KEY` with your API key value: `AIzaSyAbbQYNA0s80g7Duu0MQbfMBW60b28Y174`
+   - Add: `GEMINI_API_KEY` with your Gemini API key (get it from [Google AI Studio](https://aistudio.google.com/apikey))
+   - ⚠️ **Important:** Never commit your API key to the repository!
 
 5. **Deploy:**
    - Click "Deploy site"
