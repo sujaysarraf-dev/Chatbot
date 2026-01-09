@@ -23,7 +23,7 @@ const fallbackToOpenRouter = async (message: string, history: any[]) => {
         "X-Title": "Suji Learning AI"
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.2-3b-instruct",
+        model: "openai/gpt-oss-120b:free",
         messages: [
           { 
             role: "system", 
@@ -348,7 +348,7 @@ export const generateQuiz = async (topic: string): Promise<QuizData | null> => {
         "X-Title": "Suji Learning AI"
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.2-3b-instruct",
+        model: "openai/gpt-oss-120b:free",
         messages: [
           {
             role: "system",
